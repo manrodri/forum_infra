@@ -12,6 +12,7 @@ resource "aws_instance" "gitlab" {
 
   tags = {
     Name = "Gitlab"
+    AutoStop = "true"
   }
 }
 
@@ -29,5 +30,6 @@ resource "aws_instance" "staging_server" {
 
   tags = {
     Name = "staging_server"
+    AutoStop = "true"
   }
 }

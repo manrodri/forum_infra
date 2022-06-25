@@ -82,3 +82,42 @@ resource "aws_security_group" "jenkins" {
     Name = "jenkins-sg"
   }
 }
+
+resource "aws_security_group" "forum" {
+  name        = "app-sg-forum"
+  description = "Allow HTTP from Anywhere"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    self = true
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  vpc_id = var.vpc_id
+
+  tags = {
+    Name = "forum-sg"
+  }
+}

@@ -1,17 +1,37 @@
+#!/bin/bash
+
 sudo apt-get update
-sudo apt-get  install -y git zip unzip 
-sudo apt install mariadb-server
+# install mariadab, git, zip and nginx
+sudo apt install  git zip unzip -y
+sudo apt install nginx -y
+sudo apt install mariadb-server -y
 
-DATABASE_PASS='admin123'
-DATABAE_NAME = 'forum'
+# install php and php dependencies
+sudo apt-get install php php-mbstring php-xml php-bcmath php-fpm php-mysql  -y
+sudo apt purge  apache2 -y
+
+sudo php -m > /tmp/php-extensions
+
+#install composer
+sudo apt install -y composer
 
 
+sudo useradd -m deploy
+sudo usermod -aG sudo deploy
 
+APP_HOME=/home/deploy
+
+cd ${APP_HOME} &&  git clone https://github.com/manrodri/forum.git
+sudo chown -R www-data www-data ${APP_HOME}/forum/storage
+sudo chown -R www-data www-data ${APP_HOME}/forum/bootstrap/cache
+
+
+# configure mysql
+export DATABASE_PASS='admin123'
+
+# get forum app
 cd /tmp/
 git clone https://github.com/manrodri/forum_infra.git
-
-# Install maria-db
-
 
 # starting & enabling mariadb-server
 sudo systemctl start mariadb
@@ -20,13 +40,59 @@ sudo systemctl enable mariadb
 
 #restore the dump file for the application
 sudo mysqladmin -u root password "$DATABASE_PASS"
-sudo mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('$DATABASE_PASS') WHERE User='root'"
+sudo mysql -u root -p"$DATABASE_PASS" -e "UPDATE mysql.user SET Password=PASSWORD('forumdb') WHERE User='root'"
 sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
 sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.user WHERE User=''"
 sudo mysql -u root -p"$DATABASE_PASS" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES";
+sudo mysql -u root -p"$DATABASE_PASS" -e "create database forumdb"
+sudo mysql -u root -p"$DATABASE_PASS" -e "CREATE USER forumdb_user@'%' IDENTIFIED BY 'password2022'"
+
+sudo mysql -u root -p"$DATABASE_PASS" -e "grant all on forumdb.* TO 'forumdb_user'@'%'";
 sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
-sudo mysql -u root -p"$DATABASE_PASS" -e "create database ${DATABASE_NAME}"
-sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on ${DATABASE_NAME}.* TO 'admin'@'localhost' identified by 'admin123'"
-sudo mysql -u root -p"$DATABASE_PASS" -e "grant all privileges on ${DATABASE_NAME}.* TO 'admin'@'%' identified by 'admin123'"
-sudo mysql -u root -p"$DATABASE_PASS" ${DATABASE_NAME} < /tmp/vprofile-repo/src/main/resources/db_backup.sql
-sudo mysql -u root -p"$DATABASE_PASS" -e "FLUSH PRIVILEGES"
+
+# Restart mariadb-server
+sudo systemctl restart mariadb
+
+# configure nginx
+cat <<EOT > forum
+server {
+    listen 80;
+    listen [::]:80;
+    server_name staging.manrodri.com;
+    root ${APP_HOME}/forum/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-Content-Type-Options "nosniff";
+
+    index index.php;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+EOT
+
+sudo mv forum /etc/nginx/sites-available/forum
+sudo rm -rf /etc/nginx/sites-enabled/default
+sudo ln -s /etc/nginx/sites-available/forum /etc/nginx/sites-enabled/forum
+
+#starting nginx service
+sudo systemctl enable --now nginx
