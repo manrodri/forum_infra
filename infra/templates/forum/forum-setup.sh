@@ -5,12 +5,12 @@ sudo apt-get update
 sudo apt install  git zip unzip -y
 sudo apt install nginx -y
 sudo apt install mariadb-server -y
+apt  install awscli -y
 
 # install php and php dependencies
 sudo apt-get install php php-mbstring php-xml php-bcmath php-fpm php-mysql  -y
 sudo apt purge  apache2 -y
 
-sudo php -m > /tmp/php-extensions
 
 #install composer
 sudo apt install -y composer
@@ -19,19 +19,24 @@ sudo apt install -y composer
 sudo useradd -m deploy
 sudo usermod -aG sudo deploy
 
-APP_HOME=/home/deploy
+sudo mkdir /sites
+cd /sites
+sudo git clone https://github.com/manrodri/forum.git
+sudo chown -R deploy:deploy /home/deploy/forum
 
-cd ${APP_HOME} &&  git clone https://github.com/manrodri/forum.git
-sudo chown -R www-data www-data ${APP_HOME}/forum/storage
-sudo chown -R www-data www-data ${APP_HOME}/forum/bootstrap/cache
+APP_HOME=/sites/forum
+sudo chown -R deploy:deploy ${APP_HOME}
+sudo chown -R www-data:www-data ${APP_HOME}/storage
+sudo chown -R www-data:www-data ${APP_HOME}/bootstrap/cache
 
 
 # configure mysql
 export DATABASE_PASS='admin123'
 
 # get forum app
-cd /tmp/
-git clone https://github.com/manrodri/forum_infra.git
+cd /sites
+git clone https://github.com/manrodri/forum.git
+sudo chown -R deploy:deploy /home/deploy/forum
 
 # starting & enabling mariadb-server
 sudo systemctl start mariadb
@@ -60,17 +65,17 @@ server {
     listen 80;
     listen [::]:80;
     server_name staging.manrodri.com;
-    root ${APP_HOME}/forum/public;
+    root /sites/forum/public;
 
     add_header X-Frame-Options "SAMEORIGIN";
     add_header X-Content-Type-Options "nosniff";
 
-    index index.php;
+    index index.php index.html;
 
     charset utf-8;
 
     location / {
-        try_files $uri $uri/ /index.php?$query_string;
+        try_files \$uri \$uri/ /index.php?\$query_string;
     }
 
     location = /favicon.ico { access_log off; log_not_found off; }
@@ -79,8 +84,8 @@ server {
     error_page 404 /index.php;
 
     location ~ \.php$ {
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_pass unix:/run/php/php7.4-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
         include fastcgi_params;
     }
 
@@ -90,9 +95,16 @@ server {
 }
 EOT
 
-sudo mv forum /etc/nginx/sites-available/forum
+sudo mv forum /etc/nginx/sites-available/forum.conf
 sudo rm -rf /etc/nginx/sites-enabled/default
-sudo ln -s /etc/nginx/sites-available/forum /etc/nginx/sites-enabled/forum
+sudo ln -s /etc/nginx/sites-available/forum.conf /etc/nginx/sites-enabled/forum.conf
 
 #starting nginx service
 sudo systemctl enable --now nginx
+
+
+# deploy user
+sudo usermod -aG sudo deploy
+echo 'deploy ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/deploy
+
+

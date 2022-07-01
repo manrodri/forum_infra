@@ -23,7 +23,7 @@ data "aws_subnets" "public" {
 }
 
 data "aws_key_pair" "example" {
-  key_name = "test-key"
+  key_name = "forum2"
 }
 
 data "aws_ami" "ubuntu" {

@@ -90,7 +90,19 @@ resource "aws_iam_role_policy" "s3" {
 
 resource "aws_iam_role_policy_attachment" "sto-s3-role-policy-attach" {
   role       = aws_iam_role.forum.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "sto-ssm-role-policy-attach" {
+  role       = aws_iam_role.forum.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
+
+resource "aws_iam_role_policy_attachment" "sto-ec2-role-policy-attach" {
+  role       = aws_iam_role.forum.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2FullAccess"
+}
+
+
 
 
